@@ -11,97 +11,114 @@ export default class IndyCarCrawler extends Crawler {
             name: "IndyCar",
             genre: "Open-Wheel",
             seriesUrl: "https://www.indycar.com/",
-            logoUrl: "https://www.indycar.com/etc.clientlibs/indycar/clientlibs/clientlib-site/resources/indycar-logo.svg",
+            logoUrl: "https://www.indycar.com/-/media/IndyCar/Logos/INDYCAR-Dark.png",
             events: []
         };
     }
 
-    override async run(): Promise<EventSchema[]> {
+    override async crawl(): Promise<EventSchema[]> {
         const thisYear = new Date().getFullYear();
         const baseUrls = [
-            // `https://www.indycar.com/Schedule?year=${thisYear - 1}`,
-            // `https://www.indycar.com/Schedule?year=${thisYear}`,
+            `https://www.indycar.com/Schedule?year=${thisYear - 1}`,
+            `https://www.indycar.com/Schedule?year=${thisYear}`,
             `https://www.indycar.com/Schedule?year=${thisYear + 1}`,
         ];
 
-        let calendarItems: EventSchema[] = [];
+        let events: EventSchema[] = [];
         let visitedEventUrls = new Set<string>();
 
         for (const baseUrl of baseUrls) {
+            const year = baseUrl.split("=").at(-1);
+
             const html = await this.fetch(baseUrl);
+            if (!html) continue;
             const $basePage = load(html);
 
-            for (const scheduleListEl of $basePage(".schedule-list-container").toArray()) {
-                for (const eventCardEl of $basePage(scheduleListEl).find(".event-card").toArray()) {
-                    const eventUrl = `https://www.indycar.com${$basePage(eventCardEl).find("a").attr("href")}`;
-                    if (visitedEventUrls.has(eventUrl)) continue;
-                    visitedEventUrls.add(eventUrl);
+            for (const eventCardEl of $basePage(".schedule-list-container .event-card").toArray()) {
+                const eventUrl = `https://www.indycar.com${$basePage(eventCardEl).find("a").attr("href")}`;
+                if (visitedEventUrls.has(eventUrl)) continue;
+                visitedEventUrls.add(eventUrl);
 
-                    const eventHtml = await this.fetch(eventUrl);
-                    const $eventPage = load(eventHtml);
+                const eventHtml = await this.fetch(eventUrl);
+                if (!eventHtml) continue;
+                const $eventPage = load(eventHtml);
 
-                    const subheadText = $eventPage(".subhead").text().trim();
-                    const location = subheadText.split("|")[1].trim().split(",")[0].trim();
+                let sessions: SessionSchema[] = [];
 
-                    const scheduleContentTableEl = $eventPage("#schedule-content .schedule-table").first();
+                const eventName = $eventPage("h1.headline").text().trim();
+                const [dateRangeText, location] = $eventPage(".subhead").text().trim().split("|").map(s => s.trim());
+                const { 'start': startDate, 'end': endDate } = this.parseDateRange(dateRangeText);
 
-                    let currentDateStr = ""; // let Saturday, Mar 1
-                    for (const rowEl of $eventPage(scheduleContentTableEl).children().toArray()) {
-                        if ($eventPage(rowEl).prop("tagName") === "H3") {
-                            currentDateStr = $eventPage(rowEl).text().trim(); // Friday, Mar 8
-                            continue;
-                        }
-                        if ($eventPage(rowEl).hasClass("schedule-entry")) {
-                            const timeText = $eventPage(rowEl).find(".schedule-time").text().trim().replace("ET", "").trim();
-                            const year = baseUrl.split("=").at(-1);
-                            const month = currentDateStr.split(",")[1].trim().split(" ")[0];
-                            const day = currentDateStr.split(",")[1].trim().split(" ")[1];
-                            let datetime = this.parseFromParts(month, day, year!, timeText, "America/New_York");
-                            let isSessionTimeTBA = false;
+                const scheduleContentTableEl = $eventPage("#schedule-content .schedule-table").first();
 
-                            if (!datetime) {
-                                const rawTrackDate = subheadText.split("|")[0].trim();
-                                const trackMonth = rawTrackDate.split(" ")[0].slice(0, 3);
-                                const trackDay = rawTrackDate.split(" ")[1];
-                                console.log("IndyCar TBA date:", rawTrackDate, "|", trackMonth, "|", trackDay);
-                                datetime = this.parseFromParts(trackMonth, trackDay, year!, "00:00", "America/New_York").slice(0, 10);
-                                isSessionTimeTBA = true;
-                            }
+                let currentDateStr = "";
+                for (const rowEl of $eventPage(scheduleContentTableEl).children().toArray()) {
+                    if ($eventPage(rowEl).prop("tagName") === "H3") {
+                        currentDateStr = $eventPage(rowEl).text().trim();
+                        continue;
+                    }
+                    if ($eventPage(rowEl).hasClass("schedule-entry")) {
+                        const timeText = $eventPage(rowEl).find(".schedule-time").text().trim().replace("ET", "").trim();
+                        const month = currentDateStr.split(",")[1].trim().split(" ")[0];
+                        const day = currentDateStr.split(",")[1].trim().split(" ")[1];
+                        let datetime = this.parseFromParts(month, day, year!, timeText, "America/New_York");
 
-                            const sessionName = $eventPage(rowEl).find(".schedule-description").text().trim();
-                            if (sessionName.startsWith("NTT INDYCAR SERIES -")) {
-                                const session = sessionName.replace("NTT INDYCAR SERIES -", "").trim();
-                                const displayText = `${location} - ${session}`;
-                                const sessionType = session.includes("Practice") || session.includes("Warmup") ? "Practice"
-                                    : session.includes("Qualifications") ? "Qualifying"
-                                    : session.includes("Race") ? "Race"
-                                    : "Other";
+                        if (!datetime) continue;
 
-                                // const calendarItem: CalendarItemSchema = {
-                                //     series: {
-                                //         name: "IndyCar",
-                                //         genre: "Open-Wheel",
-                                //         url: "https://www.indycar.com/",
-                                //         logoUrl: "https://www.indycar.com/-/media/indycar/images/indycar-logo.png",
-                                //     },
-                                //     sessionUrl: eventUrl,
-                                //     trackDate: "",
-                                //     sessionDatetime: datetime,
-                                //     displayText: displayText,
-                                //     sessionType: sessionType,
-                                //     isSessionTimeTBA: isSessionTimeTBA,
-                                // };
+                        let sessionName = $eventPage(rowEl).find(".schedule-description").text().trim();
+                        if (sessionName.startsWith("NTT INDYCAR SERIES -")) {
+                            sessionName = sessionName.replace("NTT INDYCAR SERIES -", "").trim();
+                            const sessionType = sessionName.includes("Practice") || sessionName.includes("Warmup") ? "Practice"
+                                : sessionName.includes("Qualifications") ? "Qualifying"
+                                : sessionName.includes("Race") ? "Race"
+                                : "Other";
 
-                                // console.log("IndyCar", displayText, datetime, sessionType);
-                                // calendarItems.push(calendarItem);
-                            }
+                            console.log(eventName, location, datetime, sessionName, sessionType);
+
+                            sessions.push({
+                                sessionDatetime: datetime,
+                                sessionName: sessionName,
+                                sessionType: sessionType,
+                            });
                         }
                     }
                 }
+                events.push({
+                    eventUrl: eventUrl,
+                    eventName: eventName,
+                    eventStartDate: `${year}-${startDate}`,
+                    eventEndDate: `${year}-${endDate}`,
+                    location: location,
+                    sessions: sessions,
+                });
             }
         }
 
-        return calendarItems;
+        return events;
+    }
+
+    parseDateRange(dateRangeText: string) { // "February 27 - March 1", "March 6 - 7"
+        let startDay: string, startMonth: string, endDay: string, endMonth: string;
+        if (dateRangeText.split(" ").length === 4) {
+            [startMonth, startDay, , endDay] = dateRangeText.split(" ");
+            startMonth = startMonth.slice(0, 3);
+            endMonth = startMonth;
+        } else {
+            [startMonth, startDay, , endMonth, endDay] = dateRangeText.split(" ");
+            startMonth = startMonth.slice(0, 3);
+            endMonth = endMonth.slice(0, 3);
+        }
+
+        const monthMap: { [key: string]: string } = {
+            Jan: "01", Feb: "02", Mar: "03", Apr: "04",
+            May: "05", Jun: "06", Jul: "07", Aug: "08",
+            Sep: "09", Oct: "10", Nov: "11", Dec: "12"
+        };
+
+        return {
+            start: `${monthMap[startMonth]}-${startDay.padStart(2, '0')}`,
+            end: `${monthMap[endMonth]}-${endDay.padStart(2, '0')}`
+        };
     }
 
     parseFromParts(

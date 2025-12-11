@@ -16,7 +16,7 @@ export default class SuperFormulaCrawler extends Crawler {
         };
     }
 
-    override async run(): Promise<EventSchema[]> {
+    override async crawl(): Promise<EventSchema[]> {
         const thisYear = new Date().getFullYear();
         const baseUrls = [
             `https://superformula.net/sf3/race_taxonomy/${thisYear - 1}/`,
