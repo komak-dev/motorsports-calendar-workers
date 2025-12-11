@@ -1,0 +1,39 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+        "eventUrl": {
+            "type": "string",
+            "format": "uri"
+        },
+        "eventStartDate": {
+            "type": "string",
+            "format": "date"
+        },
+        "eventEndDate": {
+            "type": "string",
+            "format": "date"
+        },
+        "eventName": {
+            "type": "string"
+        },
+        "location": {
+            "type": "string"
+        },
+        "sessions": {
+            "type": "array",
+            "items": {
+                "$ref": "./session.schema.json"
+            }
+        }
+    },
+    "required": [
+        "eventUrl",
+        "eventStartDate",
+        "eventEndDate",
+        "eventName",
+        "location",
+        "sessions"
+    ]
+}

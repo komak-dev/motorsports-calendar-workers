@@ -1,0 +1,44 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+        "name": {
+            "type": "string"
+        },
+        "genre": {
+            "type": "string",
+            "enum": [
+                "Open-Wheel",
+                "Endurance",
+                "GT / Touring",
+                "Stock Car",
+                "Rally",
+                "Off-Road",
+                "Motorcycle",
+                "Other"
+            ]
+        },
+        "seriesUrl": {
+            "type": "string",
+            "format": "uri"
+        },
+        "logoUrl": {
+            "type": "string",
+            "format": "uri"
+        },
+        "events": {
+            "type": "array",
+            "items": {
+                "$ref": "./event.schema.json"
+            }
+        }
+    },
+    "required": [
+        "name",
+        "genre",
+        "seriesUrl",
+        "logoUrl",
+        "events"
+    ]
+}
