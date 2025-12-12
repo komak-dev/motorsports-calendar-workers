@@ -1,3 +1,4 @@
+import FormulaECrawler from './crawlers/formula-e';
 import Formula1Crawler from './crawlers/formula1';
 import IndyCarCrawler from './crawlers/indycar';
 import SuperFormulaCrawler from './crawlers/super-formula';
@@ -8,6 +9,10 @@ export default {
 
 		if (url.pathname === '/crawl/formula1') {
 			const crawler = new Formula1Crawler();
+			const results = await crawler.run();
+			return Response.json(results);
+		} else if (url.pathname === '/crawl/formula-e') {
+			const crawler = new FormulaECrawler();
 			const results = await crawler.run();
 			return Response.json(results);
 		} else if (url.pathname === '/crawl/indycar') {
