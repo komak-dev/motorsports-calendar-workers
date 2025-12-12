@@ -2,6 +2,7 @@ import FormulaECrawler from './crawlers/formula-e';
 import Formula1Crawler from './crawlers/formula1';
 import IndyCarCrawler from './crawlers/indycar';
 import SuperFormulaCrawler from './crawlers/super-formula';
+import WecCrawler from './crawlers/wec';
 
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
@@ -21,6 +22,10 @@ export default {
 			return Response.json(results);
 		} else if (url.pathname === '/crawl/super-formula') {
 			const crawler = new SuperFormulaCrawler();
+			const results = await crawler.run();
+			return Response.json(results);
+		} else if (url.pathname === '/crawl/wec') {
+			const crawler = new WecCrawler();
 			const results = await crawler.run();
 			return Response.json(results);
 		}
